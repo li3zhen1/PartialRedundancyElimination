@@ -2,6 +2,16 @@ struct ExprSet: Equatable {
   var hasAplusB: Bool
 
   static let empty = ExprSet(hasAplusB: false)
+  static let U = ExprSet(hasAplusB: true)
+
+  init(hasAplusB: Bool) {
+    self.hasAplusB = hasAplusB
+  }
+
+  init(_ hasAplusB: Bool) {
+    self.hasAplusB = hasAplusB
+  }
+  
 }
 
 extension ExprSet: CustomStringConvertible {
@@ -26,11 +36,19 @@ extension ExprSet {
   }
 
   func intersect(_ other: ExprSet) -> ExprSet {
-    return self - other
+    return ExprSet(hasAplusB: self.hasAplusB && other.hasAplusB)
   }
 
   func union(_ other: ExprSet) -> ExprSet {
     return ExprSet(hasAplusB: self.hasAplusB || other.hasAplusB)
+  }
+
+  static func neg(_ set: ExprSet) -> ExprSet {
+    return ExprSet(hasAplusB: !set.hasAplusB)
+  }
+
+  static prefix func !(_ value: ExprSet) -> ExprSet {
+    return ExprSet(hasAplusB: !value.hasAplusB)
   }
 }
 
@@ -62,6 +80,8 @@ struct CFG {
       self.id = "\(id)"
     }
 
+    static var entry: Node { return CFG.entry }
+    static var exit: Node { return CFG.exit }
   }
 
   struct Edge: ExpressibleByArrayLiteral, Equatable {
@@ -117,6 +137,19 @@ func dump(_ name: String, in: InSets, out: OutSets) {
   }) {
     print(
       "\(k.id) \(String(repeating: " ", count: 12 - k.id.count))\(v)\(String(repeating: " ", count: 12 - v.description.count))\(out[k]!)"
+    )
+  }
+  print("\n")
+}
+
+
+func dump(_ name: String, set: InSets) {
+  print("========== \(name) ==========")
+  for (k, v) in set.sorted(by: {
+    return weightOf($0.key) < weightOf($1.key)
+  }) {
+    print(
+      "\(k.id) \(String(repeating: " ", count: 12 - k.id.count))\(v)\(String(repeating: " ", count: 12 - v.description.count))"
     )
   }
   print("\n")

@@ -19,12 +19,12 @@ let edges: [CFG.Edge] = [
   [5, 7],
   [7, 10],
   [10, 13],
-  [13, 14], 
-  [14, 13], 
-  [13, 16], 
-  [16, 17], 
-  [7, 11], 
-  [11, 15], 
+  [13, 14],
+  [14, 13],
+  [13, 16],
+  [16, 17],
+  [7, 11],
+  [11, 15],
   [15, 17],
 ]
 
@@ -55,11 +55,8 @@ for to in cfg.nodes {
 
 cfg.nodes.sort { $0.id < $1.id }
 assert(addedCount == 11)
+assert(cfg.edges.count == 35)
 
-print("CFG nodes:")
-cfg.nodes.forEach {
-  print($0.id)
-}
 
 var e_use = Dictionary(uniqueKeysWithValues: cfg.nodes.map { ($0, ExprSet.empty) })
 var e_kill = Dictionary(uniqueKeysWithValues: cfg.nodes.map { ($0, ExprSet.empty) })
@@ -72,34 +69,93 @@ for i in [1, 5, 11] {
   e_kill[Node(i)] = true
 }
 
-var anticipated_in = Dictionary(uniqueKeysWithValues: cfg.nodes.map { ($0, ExprSet.empty) })
-var anticipated_out = Dictionary(uniqueKeysWithValues: cfg.nodes.map { ($0, ExprSet.empty) })
-
-func f_anticipated(out x: ExprSet, of bb: Node) -> ExprSet {
+func f_anticipated(OUT x: ExprSet, of bb: Node) -> ExprSet {
   return e_use[bb]!.union(x - e_kill[bb]!)
 }
 
-func iterate_anticipatable() -> Bool {
-  var isStable = true
-  for bb in cfg.nodes {
-    if bb != CFG.entry {
-      let newOut = cfg.successors(of: bb).map { anticipated_in[$0]! }.union()
-      if newOut != anticipated_out[bb] {
-        anticipated_out[bb] = newOut
-        isStable = false
-      }
-    }
-    if bb != CFG.entry {
-      let newIn = f_anticipated(out: anticipated_out[bb]!, of: bb)
-      if newIn != anticipated_in[bb] {
-        anticipated_in[bb] = newIn
-        isStable = false
-      }
-    }
-  }
-  return isStable
-}
-while !iterate_anticipatable() {}
-assert(iterate_anticipatable() == true)
+let anticipated = iterate_backward(
+  v_exit: .empty,
+  initializeInSet: .U,
+  meet: .intersect,
+  f_B: f_anticipated)
 
-dump("anticipated", in: anticipated_in, out: anticipated_out)
+func f_available(IN x: ExprSet, of bb: Node) -> ExprSet {
+  return (anticipated.IN[bb]!.union(x)) - e_kill[bb]!
+}
+
+let available = iterate_forward(
+  v_entry: .empty,
+  initializeOutSet: .U,
+  meet: .intersect,
+  f_B: f_available
+)
+
+available.printTable("available")
+
+let earliest = Dictionary(
+  uniqueKeysWithValues: cfg.nodes.map {
+    return ($0, anticipated.IN[$0]! - available.IN[$0]!)
+  })
+
+dump("ealiest", set: earliest)
+
+func f_postponable(IN x: ExprSet, of bb: Node) -> ExprSet {
+  return (earliest[bb]!.union(x) - e_use[bb]!)
+}
+
+let postponable = iterate_forward(
+  v_entry: .empty,
+  initializeOutSet: .U,
+  meet: .intersect,
+  f_B: f_postponable)
+
+func getLatest(_ bb: Node) -> ExprSet {
+  let lhs = (earliest[bb]!.union(postponable.IN[bb]!))
+  let rhs_rhs = cfg.successors(of: bb).map { s in
+    return earliest[s]!.union(postponable.IN[s]!)
+  }.intersect()
+  let rhs =
+    (e_use[bb]!.union(
+      !(rhs_rhs)
+    ))
+  return lhs.intersect(rhs)
+}
+
+var latest = Dictionary(
+  uniqueKeysWithValues: cfg.nodes.map {
+    return ($0, getLatest($0))
+  })
+
+dump("latest", set: latest)
+
+func f_used(out x: ExprSet, of bb: Node) -> ExprSet {
+  return (e_use[bb]!.union(x)) - latest[bb]!
+}
+
+let used = iterate_backward(
+  v_exit: .empty,
+  initializeInSet: .empty,
+  meet: .union,
+  f_B: f_used)
+
+
+used.printTable("used")
+
+let step8b = Dictionary(
+  uniqueKeysWithValues: cfg.nodes.map {
+    return ($0, latest[$0]!.intersect(used.OUT[$0]!))
+  })
+
+dump("step8b", set: step8b)
+
+let step8c = Dictionary(
+  uniqueKeysWithValues: cfg.nodes.map { bb in
+    return (
+      bb,
+      e_use[bb]!.intersect(
+        (!(latest[bb]!)).union(used.OUT[bb]!)
+      )
+    )
+  })
+
+dump("step8c", set: step8c)
