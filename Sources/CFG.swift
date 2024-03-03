@@ -11,7 +11,7 @@ struct ExprSet: Equatable {
   init(_ hasAplusB: Bool) {
     self.hasAplusB = hasAplusB
   }
-  
+
 }
 
 extension ExprSet: CustomStringConvertible {
@@ -47,7 +47,7 @@ extension ExprSet {
     return ExprSet(hasAplusB: !set.hasAplusB)
   }
 
-  static prefix func !(_ value: ExprSet) -> ExprSet {
+  static prefix func ! (_ value: ExprSet) -> ExprSet {
     return ExprSet(hasAplusB: !value.hasAplusB)
   }
 }
@@ -78,6 +78,10 @@ struct CFG {
 
     init(_ id: Int) {
       self.id = "\(id)"
+    }
+
+    var graphvizID: String {
+      return "node" + id.replacing("→", with: "_")
     }
 
     static var entry: Node { return CFG.entry }
@@ -115,6 +119,112 @@ struct CFG {
   }
 }
 
+extension CFG {
+  func dumpGraphviz() -> String {
+    var result = ""
+    result += ("digraph G {") + "\n"
+    for node in nodes {
+      if node.id.contains("→") {
+        result +=
+          ("  \(node.graphvizID) [label=\"Node \(node.id)\" shape=rect style=dashed];") + "\n"
+      } else {
+        if e_use[node] != .empty {
+          result += ("  \(node.graphvizID) [label=\"Node \(node.id)\n=a+b\" shape=rect];") + "\n"
+        } else {
+          result += ("  \(node.graphvizID) [label=\"Node \(node.id)\" shape=rect];") + "\n"
+        }
+      }
+    }
+    for edge in edges {
+
+      result += ("  \(edge.from.graphvizID) -> \(edge.to.graphvizID);") + "\n"
+    }
+    result += ("}") + "\n"
+    return result
+  }
+
+  func dumpTypst() -> String {
+    let insts = getInsts()
+    let labels = nodes.map { bb in
+      var ti = [String]()
+      if step8b[bb]!.hasAplusB {
+        ti.append("t = a + b")
+      }
+
+      if var inst = insts[bb]! {
+        if step8c[bb]!.hasAplusB {
+          inst.replace("a + b", with: "t")
+        }
+        let spl = inst.split(separator: "\n").map { String($0) }
+        ti.append(contentsOf: spl)
+      }
+
+      return (
+        bb.graphvizID,
+        getLabel(bb: bb, insts: ti)
+      )
+    }
+
+    var typstDescription = """
+          #raw-render(
+        ```
+        \(dumpGraphviz())
+        ```,
+        labels: (:
+          \(
+      labels.map { (k, v) in
+        return "\(k): \(v)"
+      }.joined(separator: ",\n")
+          )
+        ),
+      )
+      """
+    return typstDescription
+
+  }
+
+}
+
+func getLabel(bb: CFG.Node, insts: [String] = []) -> String {
+  var ops = ""
+  if step8b[bb]!.hasAplusB {
+    ops += "#text(fill:blue)[insert $t = a+b$]"
+  }
+  if step8c[bb]!.hasAplusB {
+    if ops.count > 0 {
+      ops += ", "
+    }
+    ops += "#text(fill:red)[replace $a+b$ with $t$]"
+  }
+  var lbl = """
+    [\(
+      insts.isEmpty ? "*\(bb.id)* \\ " : "#place()[*\(bb.id)*]"
+      ) #box(align(center, [\(insts.joined(separator: " \\ "))
+      #grid(
+      columns: (\(String(repeating: "cell_width,", count: 7))),
+      row-gutter: r_gutter,
+    )
+    """
+  lbl += "[\(e_use[bb]!)]"
+  lbl += "[ \(anticipated.IN[bb]!) ]"
+  lbl += "[ \(available.IN[bb]!) ]"
+  lbl += "[ \(earliest[bb]!) ]"
+  lbl += "[ \(postponable.IN[bb]!) ]"
+  lbl += "[ \(latest[bb]!) ]"
+  lbl += "[ \(used.IN[bb]!) ]"
+  // lbl += "[\(step8b[bb]!.hasAplusB ? "Yes" : "")]"
+
+  lbl += "[ \(e_kill[bb]!) ]"
+  lbl += "[ \(anticipated.OUT[bb]!) ]"
+  lbl += "[ \(available.OUT[bb]!) ]"
+  lbl += "[ ]"
+  lbl += "[ \(postponable.OUT[bb]!) ]"
+  lbl += "[ ]"
+  lbl += "[ \(used.OUT[bb]!) ]"
+  // lbl += "[\(step8c[bb]!.hasAplusB ? "Yes" : "")]"
+  return lbl + "]))]"
+}
+
 typealias InSets = [CFG.Node: ExprSet]
 typealias OutSets = [CFG.Node: ExprSet]
 
@@ -141,7 +251,6 @@ func dump(_ name: String, in: InSets, out: OutSets) {
   }
   print("\n")
 }
-
 
 func dump(_ name: String, set: InSets) {
   print("========== \(name) ==========")

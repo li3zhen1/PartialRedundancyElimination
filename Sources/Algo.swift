@@ -40,8 +40,7 @@ func iterate_forward(
       let newIN = meet == .union ? predOfOUT.union() : predOfOUT.intersect()
       if newIN != IN[bb] {
         IN[bb] = newIN
-
-        // modified = true
+        modified = true
       }
       let newOUT = f_B(newIN, bb)
       if newOUT != OUT[bb] {
@@ -77,7 +76,7 @@ func iterate_backward(
       let newOUT = meet == .union ? succOfIN.union() : succOfIN.intersect()
       if newOUT != OUT[bb] {
         OUT[bb] = newOUT
-        // modified = true
+        modified = true
       }
       let newIN = f_B(newOUT, bb)
       if newIN != IN[bb] {

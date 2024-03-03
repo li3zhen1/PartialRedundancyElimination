@@ -159,3 +159,37 @@ let step8c = Dictionary(
   })
 
 dump("step8c", set: step8c)
+
+
+
+
+
+var typstDescription = """
+    [ ][$e_\"use\"$][$e_\"kill\"$][anticipated_IN][anticipated_OUT][available_IN][available_OUT][earliest][postponable_IN][postponable_OUT][latest][used_IN][used_OUT][insert $t$][replace $a+b$ with $t$]
+    """
+for bb in cfg.nodes.sorted(by: { weightOf($0) < weightOf($1) }) {
+    typstDescription += "[\n\(bb.id)]"
+    typstDescription += "[$ \(e_use[bb]!) $]"
+    typstDescription += "[$ \(e_kill[bb]!) $]"
+    typstDescription += "[$ \(anticipated.IN[bb]!) $]"
+    typstDescription += "[$ \(anticipated.OUT[bb]!) $]"
+    typstDescription += "[$ \(available.IN[bb]!) $]"
+    typstDescription += "[$ \(available.OUT[bb]!) $]"
+    typstDescription += "[$ \(earliest[bb]!) $]"
+
+
+    typstDescription += "[$ \(postponable.IN[bb]!) $]"
+    typstDescription += "[$ \(postponable.OUT[bb]!) $]"
+    typstDescription += "[$ \(latest[bb]!) $]"
+    typstDescription += "[$ \(used.IN[bb]!) $]"
+    typstDescription += "[$ \(used.OUT[bb]!) $]"
+    typstDescription += "[\(step8b[bb]!.hasAplusB ? "Yes" : "")]"
+    typstDescription += "[\(step8c[bb]!.hasAplusB ? "Yes" : "")]"
+
+}
+
+print(typstDescription)
+
+
+
+print(cfg.dumpTypst())
